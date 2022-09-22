@@ -1,5 +1,4 @@
-LINE Beacon Webhook Consumer using Express
-
+# LINE Beacon Webhook Consumer using Express
 This repository contains the rough implementation of the webhook consumer to receive beacon events form LINE.
 
 The device (beacon) is hooked with LINE. Once users approach or enter the proximity of the device. Data are routinely constantly synchronized with LINE.
