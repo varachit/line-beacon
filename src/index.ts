@@ -12,7 +12,7 @@ const lineConfig: ILINEConfig = {
 
 const app: Express = express();
 const router: Router = express.Router();
-const port = process.env.PORT;
+const port = config.port;
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
