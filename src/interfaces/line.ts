@@ -1,7 +1,7 @@
 
 type EventType = 'beacon'
 type EventMode = 'active'
-type BeaconType = 'enter' | 'stay'
+type BeaconType = 'enter' | 'banner' | 'stay'
 type SourceType = 'user'
 
 export interface ILineUserProfile {
