@@ -1,52 +1,63 @@
 import express, { Express, Router, Request, Response } from 'express';
 import bodyParser from 'body-parser';
-import axios from 'axios';
-import config from './config';
+
+import { LineClient } from './lib/line';
 
 import { ILINEWebhookEvent, ILineUserProfile, ILINEConfig } from './interfaces/line';
+import { IncomingHttpHeaders } from 'http2';
+
+import config from './config';
+
+const app: Express = express();
+const router: Router = express.Router();
+const port: string = config.port;
+
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
 
 const lineConfig: ILINEConfig = {
   channelAccessToken: config.line.channelAccessToken,
   channelSecret: config.line.channelSecret
 }
 
-const app: Express = express();
-const router: Router = express.Router();
-const port = config.port;
+const lineClient: LineClient = new LineClient(lineConfig.channelAccessToken, lineConfig.channelSecret);
 
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
-
-router.get('/', (req: Request, res: Response) => {
-  res.send('Hi!');
+router.get('/', function (req: Request, res: Response) {
+  return res.status(200).send('Hi!');
 });
 
-app.post('/beaconHook', async (req: Request, res: Response) => {
-  const msSinceEpoch = new Date().getTime();
-  const body = req.body;
+router.post('/beacon', async function (req: Request, res: Response) {
+  const currentTimestamp = new Date().getTime();
 
-  console.log(`[@] Received events at ${msSinceEpoch}. Total events: ${body.events.length}`);
+  const body = req.body;
+  const headers = req.headers;
+
+  const stringifiedBody: string = JSON.stringify(body);
+  const signature: string = headers['x-line-signature'] as string;
+
+  console.log(`[@] Received an event at ${currentTimestamp}`);
+
+  if (signature === undefined || signature === null) {
+    console.error('[X] Event discarded due to no signature provided');
+    return res.status(401).send('Unauthorized');
+  }
+
+  if (lineClient.validateSignature(signature, stringifiedBody) === false) {
+    console.error(`[X] Event discarded due to the invalid signature`)
+    return res.status(401).send('Unauthorized');
+  }
+
+  console.log(`[@] Total data in an event: ${body.events.length}`);
 
   body.events.forEach(async (event: ILINEWebhookEvent) => {
-    const userProfile: ILineUserProfile = await getUserProfile(event.source.userId);
-    console.log(userProfile);
+    const userProfile: ILineUserProfile = await lineClient.getUserProfile(event.source.userId);
+    console.log(`[@] User ID: ${userProfile.userId}, Name: ${userProfile.displayName}, Picture: ${userProfile.pictureUrl}`);
   });
-
-  res.status(200);
+  return res.status(200).send('Successful');
 });
 
-async function getUserProfile (userId: string): Promise<any> {
-  const profile = await axios({
-    method: 'GET',
-    url: `https://api.line.me/v2/bot/profile/${userId}`,
-    headers: {
-      Authorization: `Bearer ${lineConfig.channelAccessToken}`
-    }
-  });
-  return profile.data;
-}
+app.use(router);
 
 app.listen(port, async () => {
   console.log(`⚡️ Express is running on port ${port}`);
 });
-
