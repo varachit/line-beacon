@@ -15,7 +15,7 @@ export interface IUserProfile {
 
 export interface IWebhookEvent {
   destination: string,
-  events: IWebhootEventData[]
+  events: IWebhookEventData[]
 }
 
 export interface IWebhookEventData {
@@ -148,7 +148,8 @@ export enum EventTypeEnum {
   MESSAGE = 'message'
 }
 
-export interface IConfig {
+export interface LineConfig {
+  baseURL: string
   channelAccessToken: string
   channelSecret: string
 }

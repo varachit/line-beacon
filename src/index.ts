@@ -1,62 +1,84 @@
-import express, { Express, Router, Request, Response } from 'express';
+import express, { Express, Request, Response } from 'express';
 import bodyParser from 'body-parser';
+import { DateTime } from 'luxon';
 
 import { LineClient } from './lib/line';
 
-import { ILINEWebhookEvent, ILineUserProfile, ILINEConfig } from './interfaces/line';
-import { IncomingHttpHeaders } from 'http2';
+import { IWebhookEvent, IWebhookEventData, IUserProfile, LineConfig } from './interfaces/line';
 
 import config from './config';
 
 const app: Express = express();
-const router: Router = express.Router();
 const port: string = config.port;
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-const lineConfig: ILINEConfig = {
+const lineConfig: LineConfig = {
+  baseURL: config.line.baseURL,
   channelAccessToken: config.line.channelAccessToken,
   channelSecret: config.line.channelSecret
 }
 
-const lineClient: LineClient = new LineClient(lineConfig.channelAccessToken, lineConfig.channelSecret);
+const lineClient = new LineClient(lineConfig.baseURL, lineConfig.channelAccessToken, lineConfig.channelSecret);
 
-router.get('/', function (req: Request, res: Response) {
-  return res.status(200).send('Hi!');
+enum EventType {
+  BEACON = 'beacon',
+  POSTBACK = 'postback',
+  MESSAGE ='message'
+}
+
+app.get('/knockknock', function (req: Request, res: Response) {
+  return res.status(200).json({ 'message': 'Hey!' });
 });
 
-router.post('/beacon', async function (req: Request, res: Response) {
-  const currentTimestamp = new Date().getTime();
+app.post('/beacon', async function (req: Request, res: Response) {
+  const currentTimestamp = DateTime.now().setZone('Asia/Bangkok').toISO();
 
   const body = req.body;
   const headers = req.headers;
 
-  const stringifiedBody: string = JSON.stringify(body);
-  const signature: string = headers['x-line-signature'] as string;
+  const stringifiedBody = JSON.stringify(body);
+  const signature = headers['x-line-signature'] as string;
 
   console.log(`[@] Received an event at ${currentTimestamp}`);
 
-  if (signature === undefined || signature === null) {
+  if (!signature) {
     console.error('[X] Event discarded due to no signature provided');
     return res.status(401).send('Unauthorized');
   }
 
-  if (lineClient.validateSignature(signature, stringifiedBody) === false) {
-    console.error(`[X] Event discarded due to the invalid signature`)
+  if (!lineClient.validateSignature(signature, stringifiedBody)) {
+    console.error(`[X] Event discarded due to the invalid signature`);
     return res.status(401).send('Unauthorized');
   }
 
   console.log(`[@] Total data in an event: ${body.events.length}`);
 
-  body.events.forEach(async (event: ILINEWebhookEvent) => {
-    const userProfile: ILineUserProfile = await lineClient.getUserProfile(event.source.userId);
-    console.log(`[@] User ID: ${userProfile.userId}, Name: ${userProfile.displayName}, Picture: ${userProfile.pictureUrl}`);
-  });
-  return res.status(200).send('Successful');
-});
 
-app.use(router);
+  body.envets.forEach(async (event: IWebhookEventData) => {
+    if (event.type === EventType.BEACON) {
+      const localTimestamp = DateTime.now().toLocaleString();
+      const userProfile = await lineClient.getUserProfile(event.source.userId);
+      console.log(`[@] User ID: ${userProfile.userId}, Name: ${userProfile.displayName}, Picture: ${userProfile.pictureUrl}`);
+
+      const messagesToReply = [
+        `Hey ${userProfile.displayName} ! Your entered the radius in proximity with the beacon and your presence is being detected at ${localTimestamp}`
+      ];
+
+      lineClient.replyMessage(event.replyToken, messagesToReply, true);
+      console.log(`[@] Messages send to ${userProfile.displayName}!`);
+    }
+    else if (event.type === EventType.POSTBACK) {
+      // Postback event logic goes here
+    }
+    else if (event.type === EventType.MESSAGE) {
+      // Message event logic goes here
+    }
+  });
+
+  return res.status(200).json({ 'message': 'OK' });
+});
 
 app.listen(port, async () => {
   console.log(`⚡️ Express is running on port ${port}`);

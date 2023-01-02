@@ -1,5 +1,5 @@
 
-export const lineErrors = {
+const LINE_ERROR_MESSAGES = {
   AUDIENCE_GROUP_CAN_NOT_UPLOAD_STATUS_EXPIRED: `This audience can't be used because it's been more than 180 days (15,552,000 seconds) since this audience was created.`,
   AUDIENCE_GROUP_COUNT_MAX_OVER: `You have already created the maximum number of audiences (1,000).`,
   AUDIENCE_GROUP_NAME_SIZE_OVER: `The audience's name is too long.`,
@@ -20,3 +20,5 @@ export const lineErrors = {
   WRONG_BOT_ID: `The bot ID in the specified request ID doesn't match the bot linked to the channel that issued the channel access token.`,
   ALREADY_ACTIVE: `The audience group is already active.`
 }
+
+export default LINE_ERROR_MESSAGES;
